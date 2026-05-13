@@ -70,6 +70,17 @@ const allQuestions = [
             'D. Là biểu tượng của sức mạnh quân sự'
         ],
         correct: 1
+    },
+    {
+        id: 7,
+        question: 'LXu thế chung của thế giới hiện nay là gì?',
+        options: [
+            'A. chạy đua vũ trang',
+            'B. đối đầu thay đối thoại',
+            'C. chiến tranh bằng vũ khí hạt nhân',
+            'D. hoà bình, ổn định và hợp tác quốc tế'
+        ],
+        correct: 3
     }
 ];
 
