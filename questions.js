@@ -73,7 +73,7 @@ const allQuestions = [
     },
     {
         id: 7,
-        question: 'LXu thế chung của thế giới hiện nay là gì?',
+        question: 'Xu thế chung của thế giới hiện nay là gì?',
         options: [
             'A. chạy đua vũ trang',
             'B. đối đầu thay đối thoại',
