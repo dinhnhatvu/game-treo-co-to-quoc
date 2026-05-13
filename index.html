@@ -79,6 +79,23 @@
             100% { opacity: 0; max-height: 0; transform: scale(0.9); padding-top: 0; padding-bottom: 0; margin-bottom: 0; border-width: 0; }
         }
 
+        @keyframes victoryFlag {
+            0%, 100% { transform: rotate(0deg); }
+            25% { transform: rotate(-3deg); }
+            75% { transform: rotate(3deg); }
+        }
+
+        @keyframes starSpin {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.3); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+
+        @keyframes winnerGlow {
+            0%, 100% { box-shadow: 0 0 10px rgba(255, 205, 0, 0.4); }
+            50% { box-shadow: 0 0 25px rgba(255, 205, 0, 0.8), 0 0 50px rgba(218, 37, 29, 0.4); }
+        }
+
         .container {
             width: 100%;
             max-width: 950px;
@@ -133,6 +150,10 @@
 
         .flag-pole-wrapper.selected-team {
             animation: glowPulse 0.8s ease-in-out;
+        }
+
+        .flag-pole-wrapper.winner-team {
+            animation: winnerGlow 1.5s ease-in-out infinite;
         }
 
         .team-label {
@@ -210,6 +231,14 @@
 
         .flag.fluttering {
             animation: flagRise 0.4s ease-in-out 3;
+        }
+
+        .flag.at-top {
+            animation: victoryFlag 1s ease-in-out infinite;
+        }
+
+        .flag.at-top .star {
+            animation: starSpin 2s ease-in-out infinite;
         }
 
         .score-badge {
@@ -605,8 +634,9 @@
 
             // ============ GAME STATE ============
             const MAX_FLAG_HEIGHT = 82;
+            const POINTS_TO_WIN = 4; // Cần 4 điểm để thắng
             const TOTAL_QUESTIONS = allQuestions.length;
-            const STEP_HEIGHT = MAX_FLAG_HEIGHT / TOTAL_QUESTIONS;
+            const STEP_HEIGHT = MAX_FLAG_HEIGHT / POINTS_TO_WIN; // Chia cho 4 thay vì tổng số câu
 
             let scores = [0, 0];
             let flagHeights = [0, 0];
@@ -618,6 +648,7 @@
             let wrongAttempts = 0;
             let remainingQuestions = [];
             let usedQuestionIds = [];
+            let gameEnded = false; // Thêm biến kiểm tra game kết thúc
 
             // ============ DOM REFS ============
             const $flag1 = document.getElementById('flag1');
@@ -665,10 +696,17 @@
                 const flag = teamIndex === 0 ? $flag1 : $flag2;
                 const height = Math.min(flagHeights[teamIndex], MAX_FLAG_HEIGHT);
                 flag.style.bottom = height + 'px';
+                
                 if (height > 0) {
                     flag.querySelector('.flag').classList.add('fluttering');
-                    setTimeout(() => flag.querySelector('.flag').classList.remove('fluttering'),
-                    1200);
+                    setTimeout(() => flag.querySelector('.flag').classList.remove('fluttering'), 1200);
+                }
+                
+                // Thêm hiệu ứng đặc biệt khi cờ lên đỉnh
+                if (height >= MAX_FLAG_HEIGHT) {
+                    flag.querySelector('.flag').classList.add('at-top');
+                    const poleWrapper = teamIndex === 0 ? $flagPole1 : $flagPole2;
+                    poleWrapper.classList.add('winner-team');
                 }
             }
 
@@ -742,6 +780,8 @@
             }
 
             function loadQuestion() {
+                if (gameEnded) return; // Không load câu hỏi mới nếu game đã kết thúc
+                
                 const q = getRandomQuestion();
                 if (!q) {
                     endGame();
@@ -769,7 +809,7 @@
 
             // Global function
             window.selectTeam = function(teamIndex) {
-                if (!currentQuestion || isWaitingForNext || roundActive) return;
+                if (!currentQuestion || isWaitingForNext || roundActive || gameEnded) return;
                 if (selectedTeam !== null) return;
 
                 selectedTeam = teamIndex;
@@ -784,7 +824,7 @@
             };
 
             function handleAnswer(selectedIndex) {
-                if (!roundActive || isWaitingForNext || selectedTeam === null) return;
+                if (!roundActive || isWaitingForNext || selectedTeam === null || gameEnded) return;
                 if (!currentQuestion) return;
 
                 const isCorrect = (selectedIndex === currentQuestion.correct);
@@ -794,7 +834,8 @@
                     // ĐÚNG
                     roundActive = false;
                     scores[selectedTeam]++;
-                    flagHeights[selectedTeam] = scores[selectedTeam] * STEP_HEIGHT;
+                    // Tính chiều cao dựa trên POINTS_TO_WIN (4)
+                    flagHeights[selectedTeam] = Math.min(scores[selectedTeam], POINTS_TO_WIN) * STEP_HEIGHT;
                     updateFlag(selectedTeam);
                     updateScores();
                     answeredCount++;
@@ -808,11 +849,30 @@
                     $statusText.style.color = '#0d904f';
                     $turnIndicator.textContent = '';
 
-                    isWaitingForNext = true;
-                    $btnNext.disabled = false;
-                    $btnTeam1.disabled = true;
-                    $btnTeam2.disabled = true;
-                    $teamSelectArea.style.display = 'none';
+                    // Kiểm tra điều kiện thắng (4 điểm)
+                    if (scores[selectedTeam] >= POINTS_TO_WIN) {
+                        // Đội này đã thắng!
+                        gameEnded = true;
+                        isWaitingForNext = true;
+                        $btnNext.disabled = true; // Vô hiệu hóa nút tiếp theo
+                        $btnTeam1.disabled = true;
+                        $btnTeam2.disabled = true;
+                        $teamSelectArea.style.display = 'none';
+                        
+                        $statusText.textContent = '🏆 ' + teamName + ' đã kéo cờ lên đỉnh và CHIẾN THẮNG! 🏆';
+                        $statusText.style.color = '#ffcd00';
+                        
+                        // Hiển thị game over sau 1.5 giây
+                        setTimeout(() => {
+                            endGame();
+                        }, 1500);
+                    } else {
+                        isWaitingForNext = true;
+                        $btnNext.disabled = false;
+                        $btnTeam1.disabled = true;
+                        $btnTeam2.disabled = true;
+                        $teamSelectArea.style.display = 'none';
+                    }
                 } else {
                     // SAI - đáp án biến mất
                     wrongAttempts++;
@@ -862,11 +922,12 @@
             }
 
             function nextQuestion() {
-                if (!isWaitingForNext) return;
+                if (!isWaitingForNext || gameEnded) return;
                 loadQuestion();
             }
 
             function endGame() {
+                gameEnded = true;
                 roundActive = false;
                 isWaitingForNext = true;
                 currentQuestion = null;
@@ -903,11 +964,21 @@
                 isWaitingForNext = false;
                 roundActive = false;
                 wrongAttempts = 0;
+                gameEnded = false; // Reset trạng thái game
                 usedQuestionIds = [];
                 remainingQuestions = shuffle([...allQuestions]);
+                
+                // Reset hiệu ứng cờ
                 updateFlag(0);
                 updateFlag(1);
                 updateScores();
+                
+                // Xóa hiệu ứng winner
+                $flag1.querySelector('.flag').classList.remove('at-top');
+                $flag2.querySelector('.flag').classList.remove('at-top');
+                $flagPole1.classList.remove('winner-team');
+                $flagPole2.classList.remove('winner-team');
+                
                 $gameOverOverlay.classList.remove('active');
                 $btnTeam1.disabled = false;
                 $btnTeam2.disabled = false;
@@ -932,24 +1003,24 @@
             document.addEventListener('keydown', (e) => {
                 if ($gameOverOverlay.classList.contains('active')) return;
                 if ((e.key === 'q' || e.key === 'Q') && !roundActive && !isWaitingForNext &&
-                    currentQuestion) {
+                    currentQuestion && !gameEnded) {
                     e.preventDefault();
                     selectTeam(0);
                 }
                 if ((e.key === 'p' || e.key === 'P') && !roundActive && !isWaitingForNext &&
-                    currentQuestion) {
+                    currentQuestion && !gameEnded) {
                     e.preventDefault();
                     selectTeam(1);
                 }
                 if (e.key >= '1' && e.key <= '4' && roundActive && !isWaitingForNext && selectedTeam !==
-                    null) {
+                    null && !gameEnded) {
                     const idx = parseInt(e.key) - 1;
                     const btn = answerButtons[idx];
                     if (btn && !btn.disabled && !btn.classList.contains('fade-out')) {
                         handleAnswer(idx);
                     }
                 }
-                if ((e.key === 'Enter' || e.key === ' ') && isWaitingForNext) {
+                if ((e.key === 'Enter' || e.key === ' ') && isWaitingForNext && !gameEnded) {
                     e.preventDefault();
                     nextQuestion();
                 }
@@ -964,6 +1035,7 @@
             console.log('   ❌ Sai → đáp án biến mất → đội kia trả lời');
             console.log('   🎲 Câu hỏi xuất hiện ngẫu nhiên');
             console.log('   ✅ Đúng: +1 điểm, cờ kéo lên');
+            console.log('   🏆 Đạt 4 điểm: Cờ lên đỉnh → CHIẾN THẮNG!');
             console.log('   ⌨️ Q/P: chọn đội | 1-4: chọn đáp án | Enter: tiếp tục');
         })();
     </script>
